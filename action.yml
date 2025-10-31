@@ -48,7 +48,11 @@ runs:
     - shell: bash
       run: |
         echo "${{ inputs.server-ssh-key }}" > private_key && chmod 600 private_key
+        if [[ $application_file == *.tar.gz ]];then
+        scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-file }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}.tar.gz || exit 1
+        elif [[ $application_file == *.zip ]];then
         scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-file }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}.zip || exit 1
+        fi
         DEPLOY_ARGS="-n ${{ inputs.application-name }} -a work/${{ inputs.application-name }}.zip"
         if [ -n "${{ inputs.application-vhost }}" ]; then
           scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-vhost }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}-vhost.conf || exit 1
