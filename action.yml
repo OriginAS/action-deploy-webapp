@@ -1,0 +1,64 @@
+name: 'Deploy webapp'
+description: 'Deploys zipped webapp to a AWS EC2 server using SSH'
+author: 'gskjold'
+inputs:
+  aws-access-key-id:
+    description: 'AWS access key that enables this action to update a security group to allow access from this action'
+    required: true
+  aws-secret-access-key:
+    description: 'AWS access key secret'
+    required: true
+  aws-security-group-id:
+    description: 'The ID of the security group we should add access from this action to'
+    required: true
+  application-name:
+    description: 'The name that the application should be install as on the server'
+    required: true
+  application-file:
+    description: 'The .zip or .tar.gz file that is the packaged version of the project'
+    required: true
+  application-vhost:
+    description: 'The vhost.conf file for apache virtual host'
+    required: false
+    default: ''
+  server-host:
+    description: 'Host name of the server to deploy to'
+    required: true
+  server-ssh-key:
+    description: 'SSH private key that can access the server'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - id: ip
+      uses: haythem/public-ip@v1.2
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: eu-north-1
+    - shell: bash
+      run: |
+        aws ec2 authorize-security-group-ingress \
+          --group-id ${{ inputs.aws-security-group-id }} \
+          --protocol tcp \
+          --port 22 \
+          --cidr ${{ steps.ip.outputs.ipv4 }}/32
+
+    - shell: bash
+      run: |
+        echo "${{ inputs.server-ssh-key }}" > private_key && chmod 600 private_key
+        scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-file }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}.zip || exit 1
+        DEPLOY_ARGS="-n ${{ inputs.application-name }} -a work/${{ inputs.application-name }}.zip"
+        if [ -n "${{ inputs.application-vhost }}" ]; then
+          scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-vhost }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}-vhost.conf || exit 1
+          DEPLOY_ARGS="$DEPLOY_ARGS -v work/${{ inputs.application-name }}-vhost.conf"
+        fi
+        ssh -o StrictHostKeyChecking=no -i private_key actions@${{ inputs.server-host }} "~/deploy-webapp $DEPLOY_ARGS" || exit 1
+    - shell: bash
+      run: |
+        aws ec2 revoke-security-group-ingress \
+          --group-id ${{ inputs.aws-security-group-id }} \
+          --protocol tcp \
+          --port 22 \
+          --cidr ${{ steps.ip.outputs.ipv4 }}/32
