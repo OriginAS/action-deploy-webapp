@@ -17,6 +17,10 @@ inputs:
   application-file:
     description: 'The .zip or .tar.gz file that is the packaged version of the project'
     required: true
+  application-env:
+    description: 'The .env file containing necessary environmental variables'
+    required: false
+    default: ''
   application-vhost:
     description: 'The vhost.conf file for apache virtual host'
     required: false
@@ -54,6 +58,10 @@ runs:
         elif [[ ${{ inputs.application-file }} == *.zip ]];then
           scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-file }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}.zip || exit 1
           DEPLOY_ARGS="-n ${{ inputs.application-name }} -a work/${{ inputs.application-name }}.zip"
+        fi
+        if [ -n "${{ inputs.application-env }}" ]; then
+          scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-env }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}.env || exit 1
+          DEPLOY_ARGS="$DEPLOY_ARGS -e work/${{ inputs.application-name }}.env"
         fi
         if [ -n "${{ inputs.application-vhost }}" ]; then
           scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-vhost }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}-vhost.conf || exit 1
