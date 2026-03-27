@@ -25,6 +25,10 @@ inputs:
     description: 'The vhost.conf file for apache virtual host'
     required: false
     default: ''
+  application-web-root:
+    description: 'The base path for the web root ex. /var/www'
+    required: false
+    default: ''
   server-host:
     description: 'Host name of the server to deploy to'
     required: true
@@ -66,6 +70,9 @@ runs:
         if [ -n "${{ inputs.application-vhost }}" ]; then
           scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-vhost }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}-vhost.conf || exit 1
           DEPLOY_ARGS="$DEPLOY_ARGS -v work/${{ inputs.application-name }}-vhost.conf"
+        fi
+        if [ -n "${{ inputs.application-web-root }}" ]; then
+          DEPLOY_ARGS="$DEPLOY_ARGS -w ${{ inputs.application-web-root }}"
         fi
         ssh -o StrictHostKeyChecking=no -i private_key actions@${{ inputs.server-host }} "~/deploy-webapp-2025 $DEPLOY_ARGS" || exit 1
     - shell: bash
