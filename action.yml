@@ -38,8 +38,10 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - id: ip
-      uses: haythem/public-ip@v1.2
+    - name: Get runner ip address
+      id: ip
+      shell: bash
+      run: echo "ipv4=$(curl -4 -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ inputs.aws-access-key-id }}
