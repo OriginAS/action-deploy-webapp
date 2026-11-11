@@ -67,41 +67,55 @@ runs:
         aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
         aws-region: eu-north-1
     - shell: bash
+      env:
+        AWS_SG: ${{ inputs.aws-security-group-id }}
+        RUNNER_IP: ${{ steps.ip.outputs.ipv4 }}
       run: |
         aws ec2 authorize-security-group-ingress \
-          --group-id ${{ inputs.aws-security-group-id }} \
+          --group-id ${AWS_SG} \
           --protocol tcp \
           --port 22 \
-          --cidr ${{ steps.ip.outputs.ipv4 }}/32
+          --cidr ${RUNNER_IP}/32
 
     - shell: bash
+      env:
+        SSH_KEY: ${{ inputs.server-ssh-key }}
+        APP_FILE: ${{ inputs.application-file }}
+        SERVER_HOST: ${{ inputs.server-host }}
+        APP_NAME: ${{ inputs.application-name }}
+        APP_ENV: ${{ inputs.application-env }}
+        APP_VHOST: ${{ inputs.application-vhost }}
+        APP_WEB_ROOT: ${{ inputs.application-web-root }}
       run: |
-        echo "${{ inputs.server-ssh-key }}" > private_key && chmod 600 private_key
-        if [[ ${{ inputs.application-file }} == *.tar.gz ]];then
-          scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-file }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}.tar.gz || exit 1
-          DEPLOY_ARGS="-n ${{ inputs.application-name }} -a work/${{ inputs.application-name }}.tar.gz"
-        elif [[ ${{ inputs.application-file }} == *.zip ]];then
-          scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-file }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}.zip || exit 1
-          DEPLOY_ARGS="-n ${{ inputs.application-name }} -a work/${{ inputs.application-name }}.zip"
+        echo "${SSH_KEY}" > private_key && chmod 600 private_key
+        if [[ ${APP_FILE} == *.tar.gz ]];then
+          scp -o StrictHostKeyChecking=no -i private_key ${APP_FILE} actions@${SERVER_HOST}:work/${APP_NAME}.tar.gz || exit 1
+          DEPLOY_ARGS="-n ${APP_NAME} -a work/${APP_NAME}.tar.gz"
+        elif [[ ${APP_FILE} == *.zip ]];then
+          scp -o StrictHostKeyChecking=no -i private_key ${APP_FILE} actions@${SERVER_HOST}:work/${APP_NAME}.zip || exit 1
+          DEPLOY_ARGS="-n ${APP_NAME} -a work/${APP_NAME}.zip"
         fi
-        if [ -n "${{ inputs.application-env }}" ]; then
-          scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-env }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}.env || exit 1
-          DEPLOY_ARGS="$DEPLOY_ARGS -e work/${{ inputs.application-name }}.env"
+        if [ -n "${APP_ENV}" ]; then
+          scp -o StrictHostKeyChecking=no -i private_key ${APP_ENV} actions@${SERVER_HOST}:work/${APP_NAME}.env || exit 1
+          DEPLOY_ARGS="$DEPLOY_ARGS -e work/${APP_NAME}.env"
         fi
-        if [ -n "${{ inputs.application-vhost }}" ]; then
-          scp -o StrictHostKeyChecking=no -i private_key ${{ inputs.application-vhost }} actions@${{ inputs.server-host }}:work/${{ inputs.application-name }}-vhost.conf || exit 1
-          DEPLOY_ARGS="$DEPLOY_ARGS -v work/${{ inputs.application-name }}-vhost.conf"
+        if [ -n "${APP_VHOST}" ]; then
+          scp -o StrictHostKeyChecking=no -i private_key ${APP_VHOST} actions@${SERVER_HOST}:work/${APP_NAME}-vhost.conf || exit 1
+          DEPLOY_ARGS="$DEPLOY_ARGS -v work/${APP_NAME}-vhost.conf"
         fi
-        if [ -n "${{ inputs.application-web-root }}" ]; then
-          DEPLOY_ARGS="$DEPLOY_ARGS -w ${{ inputs.application-web-root }}"
+        if [ -n "${APP_WEB_ROOT}" ]; then
+          DEPLOY_ARGS="$DEPLOY_ARGS -w ${APP_WEB_ROOT}"
         fi
-        ssh -o StrictHostKeyChecking=no -i private_key actions@${{ inputs.server-host }} "~/deploy-webapp-2025 $DEPLOY_ARGS" || exit 1
+        ssh -o StrictHostKeyChecking=no -i private_key actions@${SERVER_HOST} "~/deploy-webapp-2025 $DEPLOY_ARGS" || exit 1
     - name: Revoke runner IP address
       if: always() && steps.ip.outputs.ipv4 != ''
       shell: bash
+      env:
+        AWS_SG: ${{ inputs.aws-security-group-id }}
+        RUNNER_IP: ${{ steps.ip.outputs.ipv4 }}
       run: |
         aws ec2 revoke-security-group-ingress \
-          --group-id ${{ inputs.aws-security-group-id }} \
+          --group-id ${AWS_SG} \
           --protocol tcp \
           --port 22 \
-          --cidr ${{ steps.ip.outputs.ipv4 }}/32
+          --cidr ${RUNNER_IP}/32
